@@ -1,4 +1,4 @@
-import database from "../../../../infra/database";
+import database from "infra/database";
 
 async function status(request, response) {
   const version = await database.query("SHOW server_version;");
