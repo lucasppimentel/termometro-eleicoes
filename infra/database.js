@@ -152,9 +152,9 @@ const buildPostQuery = async (tabela, colunas) => {
       "fim",
       "id_classificacao",
     ],
-    interlocutores: ["id_interlocutor", "nome"],
+    interlocutores: ["id_interlocutor", "nome_interlocutor"],
     debates: ["id_debate", "duracao", "data_debate", "anfitriao"],
-    classificacoes: ["id_classificacao", "nome"],
+    classificacoes: ["id_classificacao", "nome_classificacao"],
   };
 
   if (!colunasPermitidas[tabela]) {
