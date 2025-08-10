@@ -72,6 +72,8 @@ const buildQuery = (tabelas, filtros) => {
           `Coluna '${coluna}' na tabela '${tabela}' não permitida.`,
         );
       }
+
+      // Colunas que serão selecionadas
       userQuery += `${tabela}.${coluna},\n`;
     }
   }
