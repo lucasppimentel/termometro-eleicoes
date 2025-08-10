@@ -1,7 +1,10 @@
 services:
-  database:
-    image: "postgres:16.6-alpine3.21"
-    env_file:
-      - ../.env.development
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j
     ports:
-      - "5432:5432"
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+      - NEO4J_AUTH=neo4j/password
