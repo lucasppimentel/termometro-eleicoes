@@ -6,32 +6,44 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const session = driver.session();
     try {
-      // Use OPTIONAL MATCH to find speeches even if some relationships are missing
       const result = await session.run(`
-        MATCH (f:Speech)
-        OPTIONAL MATCH (f)<-[r_a:PROFERIU]-(i:Candidato)
-        OPTIONAL MATCH (f)<-[r_b:TEM_DISCURSO]-(d:Debate)
-        RETURN f, i, d
+        MATCH (p:Proposal)
+        OPTIONAL MATCH (p)<-[r_a:CONTEM_PROPOSTA]-(f:Speech)
+        OPTIONAL MATCH (f)<-[r_b:PROFERIU]-(c:Candidato)
+        OPTIONAL MATCH (f)<-[r_c:TEM_DISCURSO]-(d:Debate)
+        RETURN p, f, c, d
         ORDER BY f.inicio
       `);
 
-      console.log("Result records from GET request:", result.records);
+      console.debug(result);
 
-      const speeches = result.records.map((record) => {
-        const fala = record.get("f")?.properties || {};
-        const candidato = record.get("i")?.properties || null;
+      const proposals = result.records.map((record) => {
+        const proposal = record.get("p")?.properties || {};
+        const speech = record.get("f")?.properties || null;
+        const candidato = record.get("c")?.properties || null;
         const debate = record.get("d")?.properties || null;
 
         return {
-          ...fala,
-          candidato, // return full candidato object
-          debate, // return full debate object
+          ...proposal,
+          speech: speech
+            ? {
+                ...speech,
+                candidato: candidato
+                  ? {
+                      ...candidato,
+                      nr_cpf: candidato.nr_cpf?.low ?? null,
+                      nr_candidato: candidato.nr_candidato?.low ?? null,
+                    }
+                  : null,
+                debate: debate || null,
+              }
+            : null,
         };
       });
 
-      res.status(200).json(speeches);
+      res.status(200).json(proposals);
     } catch (error) {
-      console.error("Error fetching speeches:", error);
+      console.error("Error fetching proposals:", error);
       res.status(500).json({ error: "Internal Server Error" });
     } finally {
       await session.close();

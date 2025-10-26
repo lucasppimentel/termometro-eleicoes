@@ -1,14 +1,8 @@
-import neo4j from "neo4j-driver";
-import { NextResponse } from "next/server";
+import { getNeo4jDriver } from "../../../../infra/database";
 
-const uri = "neo4j://" + process.env.NEO4J_URL + ":" + process.env.NEO4J_PORT;
-const user = "neo4j";
-const password = process.env.NEO4J_PASSWORD;
-
-let driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
-
-// // --- API Endpoint: GET /status ---
+// --- API Endpoint: GET /status ---
 export default async function handler(req, res) {
+  const driver = getNeo4jDriver();
   const session = driver.session();
 
   if (req.method === "GET") {

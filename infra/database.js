@@ -1,4 +1,29 @@
 import { Client } from "pg";
+import neo4j from "neo4j-driver";
+
+// Neo4j connection setup
+const neo4jUri = process.env.NEO4J_URL;
+const neo4jUser = "neo4j";
+const neo4jPassword = process.env.NEO4J_PASSWORD;
+
+let neo4jDriver = null;
+
+export function getNeo4jDriver() {
+  if (!neo4jDriver) {
+    neo4jDriver = neo4j.driver(
+      neo4jUri,
+      neo4j.auth.basic(neo4jUser, neo4jPassword)
+    );
+  }
+  return neo4jDriver;
+}
+
+export async function closeNeo4jDriver() {
+  if (neo4jDriver) {
+    await neo4jDriver.close();
+    neo4jDriver = null;
+  }
+}
 
 async function query(queryObject) {
   let client;
@@ -197,4 +222,6 @@ export default {
   getNewClient,
   buildQuery,
   buildPostQuery,
+  getNeo4jDriver,
+  closeNeo4jDriver,
 };
