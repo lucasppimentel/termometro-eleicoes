@@ -1,449 +1,154 @@
-import React, { useState, useEffect, useCallback } from "react";
+// pages/index.js
 
-// Busca propostas de /api/v1/proposals
-const fetchProposals = async () => {
-  const endpointUrl = "/api/v1/proposals";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+// Importação de ícones Lucide
+import { Users, Clock, Zap, MapPin, Target, ChevronRight } from 'lucide-react';
 
-  const response = await fetch(endpointUrl);
-  if (!response.ok) {
-    throw new Error(`Erro ao carregar propostas: ${response.statusText}`);
-  }
-  return response.json();
+// Mapeamento de cores para a pontuação de Relevância
+const getRelevanceStyle = (score) => {
+    if (score === 'N/A') return 'bg-gray-200 text-gray-700';
+    const numScore = parseFloat(score);
+    if (numScore >= 4.0) return 'bg-green-100 text-green-700 border-green-400';
+    if (numScore >= 3.0) return 'bg-yellow-100 text-yellow-700 border-yellow-400';
+    return 'bg-red-100 text-red-700 border-red-400';
 };
 
-// Componente principal
-export default function DebateScreen() {
-  const [proposalsByCandidate, setProposalsByCandidate] = useState({});
-  const [candidateSummary, setCandidateSummary] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [currentVideo, setCurrentVideo] = useState({
-    youtubeId: null,
-    startTime: 0,
-    debateTitle: "Selecione uma Proposta para Iniciar o Vídeo",
-  });
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
-  const [showVideoModal, setShowVideoModal] = useState(false);
+// Componente para um cartão de debate individual
+const DebateCard = ({ debate }) => {
+    const relevanceStyle = getRelevanceStyle(debate.relevancia_media);
 
-  // Função para carregar e organizar os dados por candidato
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const proposalsData = await fetchProposals();
-
-      // Agrupar propostas por candidato
-      const groupedByCandidate = {};
-      proposalsData.forEach((proposal) => {
-        if (proposal.speech?.candidato?.nome_urna) {
-          const candidateName = proposal.speech.candidato.nome_urna;
-          
-          if (!groupedByCandidate[candidateName]) {
-            groupedByCandidate[candidateName] = {
-              candidato: proposal.speech.candidato,
-              proposals: [],
-            };
-          }
-          
-          groupedByCandidate[candidateName].proposals.push(proposal);
-        }
-      });
-
-      setProposalsByCandidate(groupedByCandidate);
-
-      // Criar resumo de candidatos (ordem por número de propostas)
-      const summary = Object.entries(groupedByCandidate)
-        .map(([name, data]) => ({
-          name,
-          candidato: data.candidato,
-          totalProposals: data.proposals.length,
-        }))
-        .sort((a, b) => b.totalProposals - a.totalProposals);
-
-      setCandidateSummary(summary);
-
-      // Auto-selecionar o primeiro candidato
-      if (summary.length > 0) {
-        setSelectedCandidate(summary[0].name);
-      }
-    } catch (err) {
-      console.error("Erro ao carregar dados dos debates:", err);
-      setError(
-        "Não foi possível carregar os dados. Tente novamente mais tarde.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  /**
-   * Função que é executada ao clicar em uma proposta.
-   */
-  const handleProposalClick = (proposal) => {
-    const speech = proposal.speech;
-    
-    if (speech && speech.debate) {
-      const debate = speech.debate;
-      const youtubeId = debate.debate_id;
-      // Use 'inicio' or 'start' depending on what the API returns
-      const startTimeInSeconds = Math.floor(speech.inicio || speech.start || 0);
-
-      setCurrentVideo({
-        youtubeId: youtubeId,
-        startTime: startTimeInSeconds,
-        debateTitle: debate.title || "Debate",
-      });
-      setShowVideoModal(true);
-    } else {
-      console.error("Informação do debate não encontrada para a proposta");
-    }
-  };
-
-  // Obter propostas do candidato selecionado
-  const selectedProposals = selectedCandidate 
-    ? proposalsByCandidate[selectedCandidate]?.proposals || []
-    : [];
-
-  if (loading) {
-    return <div style={styles.loading}>Carregando dados dos debates...</div>;
-  }
-
-  if (error) {
-    return <div style={styles.error}>{error}</div>;
-  }
-
-  return (
-    <div style={styles.container}>
-      {/* Conteúdo principal - full width */}
-      <div style={styles.mainContent}>
-        {/* Lista de Candidatos */}
-        <div style={styles.candidatesSection}>
-          <h2>Candidatos</h2>
-          <div style={styles.candidatesList}>
-            {candidateSummary.map((candidate) => (
-              <div
-                key={candidate.name}
-                style={{
-                  ...styles.candidateCard,
-                  ...(selectedCandidate === candidate.name
-                    ? styles.candidateCardActive
-                    : {}),
-                }}
-                onClick={() => setSelectedCandidate(candidate.name)}
-              >
-                <div style={styles.candidateCardHeader}>
-                  <span style={styles.candidateName}>{candidate.name}</span>
-                  <span style={styles.proposalCount}>
-                    {candidate.totalProposals} propostas
-                  </span>
+    return (
+    <Link href={`/debate/${debate.id}/discussions`} className="block">
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg hover:shadow-2xl transition duration-300 transform hover:-translate-y-1">
+                
+                {/* Cabeçalho */}
+                <div className="flex justify-between items-start mb-4 border-b pb-3">
+                    <h2 className="text-xl font-extrabold text-gray-900 leading-snug hover:text-indigo-600 transition-colors">
+                        {debate.title}
+                    </h2>
+                    <ChevronRight className="w-6 h-6 text-gray-400 flex-shrink-0 ml-4 group-hover:text-indigo-600" />
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Lista de Propostas do Candidato Selecionado */}
-        <div style={styles.proposalsSection}>
-          <h2>
-            {selectedCandidate
-              ? `Propostas de ${selectedCandidate}`
-              : "Selecione um candidato"}
-          </h2>
-          {selectedProposals.length > 0 ? (
-            <div style={styles.proposalsList}>
-              {selectedProposals.map((proposal, index) => (
-                <ProposalItem
-                  key={index}
-                  proposal={proposal}
-                  onClick={() => handleProposalClick(proposal)}
-                />
-              ))}
+                {/* Metadados */}
+                <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                    <p className="flex items-center"><Target className="w-4 h-4 mr-2 text-indigo-500" /> **Cargo:** {debate.cargo}</p>
+                    <p className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-indigo-500" /> **Local:** {debate.location}</p>
+                    <p className="flex items-center"><Clock className="w-4 h-4 mr-2 text-indigo-500" /> **Data:** {debate.date}</p>
+                </div>
+
+                {/* Participantes */}
+                <div className="mb-4">
+                    <p className="flex items-center text-gray-700 font-semibold mb-1"><Users className="w-4 h-4 mr-2 text-gray-500" /> Participantes:</p>
+                    <div className="flex flex-wrap gap-2">
+                        {debate.participantes.slice(0, 5).map((nome, i) => (
+                            <span key={i} className="bg-indigo-50 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded-full">{nome}</span>
+                        ))}
+                        {debate.participantes.length > 5 && (
+                             <span className="bg-gray-50 text-gray-600 text-xs font-medium px-2.5 py-0.5 rounded-full">+{debate.participantes.length - 5} outros</span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Temas */}
+                <div className="mb-4">
+                    <p className="flex items-center text-gray-700 font-semibold mb-1"><Target className="w-4 h-4 mr-2 text-gray-500" /> Temas Principais:</p>
+                    <div className="flex flex-wrap gap-2">
+                        {debate.temas.slice(0, 4).map((tema, i) => (
+                            <span key={i} className="bg-teal-50 text-teal-800 text-xs font-medium px-2.5 py-0.5 rounded-lg">{tema}</span>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Relevância Média */}
+                <div className={`mt-4 p-3 rounded-lg border flex items-center justify-between ${relevanceStyle}`}>
+                    <p className="font-bold flex items-center">
+                        <Zap className="w-5 h-5 mr-2" />
+                        Relevância Média das Respostas:
+                    </p>
+                    <span className="text-2xl font-extrabold">
+                        {debate.relevancia_media} / 5.0
+                    </span>
+                </div>
             </div>
-          ) : (
-            <p style={styles.emptyMessage}>
-              {selectedCandidate
-                ? "Nenhuma proposta encontrada."
-                : "Selecione um candidato para ver suas propostas."}
-            </p>
-          )}
+        </Link>
+    );
+};
+
+
+// Componente Principal da Home Page
+const HomePage = () => {
+    const [debates, setDebates] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const response = await fetch('/api/v1/debates/');
+                if (!response.ok) {
+                    throw new Error('Falha ao carregar a lista de debates');
+                }
+                const result = await response.json();
+                setDebates(result);
+                setError(null);
+            } catch (err) {
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    if (loading) {
+        return (
+             <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                 <p className="text-xl text-indigo-600">Carregando lista de debates...</p>
+             </div>
+        );
+    }
+
+    if (error) {
+        return <div className="p-8 text-center text-red-600 bg-red-100 rounded-lg shadow-inner max-w-lg mx-auto mt-10">Erro: {error}</div>;
+    }
+    
+    // Filtra para garantir que apenas debates com ID sejam exibidos
+    const displayDebates = debates.filter(d => d.id);
+
+    return (
+        <div className="min-h-screen bg-gray-50 p-4 sm:p-8 font-sans">
+
+            {/* Faixa de aviso: Quer acesso aos dados? Use nossa API! */}
+            <div className="w-full bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md p-3 text-center mb-6">
+                <p className="text-sm sm:text-base font-semibold">Quer acesso aos dados? <span className="font-extrabold">Use nossa API!</span></p>
+            </div>
+
+            <header className="mb-10 text-center border-b pb-6">
+                <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
+                    🏛️ Repositório de Debates
+                </h1>
+                <p className="mt-3 text-xl text-gray-600">Explore debates e veja a performance avaliada dos participantes.</p>
+            </header>
+
+            <div className="max-w-3xl mx-auto flex flex-col gap-6">
+                {displayDebates.length > 0 ? (
+                    displayDebates.map((debate) => (
+                        <DebateCard key={debate.id} debate={debate} />
+                    ))
+                ) : (
+                            <div className="w-full text-center p-10 bg-white rounded-lg shadow">
+                         <p className="text-lg text-gray-700">Nenhum debate encontrado no banco de dados.</p>
+                    </div>
+                )}
+            </div>
+
+            <div className="text-center mt-12 p-4 bg-indigo-50 rounded-lg text-indigo-700 border-t-4 border-indigo-400 max-w-4xl mx-auto">
+                <p className="text-sm">A relevância média reflete a nota média (1.0 a 5.0) dada às respostas do debate.</p>
+            </div>
         </div>
-      </div>
-
-      {/* Modal do Vídeo */}
-      {showVideoModal && (
-        <VideoModal
-          currentVideo={currentVideo}
-          onClose={() => setShowVideoModal(false)}
-        />
-      )}
-    </div>
-  );
-}
-
-// --- Componente de Item da Proposta ---
-const ProposalItem = ({ proposal, onClick }) => {
-  const [isHovered, setIsHovered] = useState(false);
-
-  let proposalTexts;
-  try {
-    proposalTexts = JSON.parse(proposal.text);
-  } catch (e) {
-    proposalTexts = ["Erro ao ler propostas"];
-  }
-
-  return (
-    <div
-      style={{
-        ...styles.proposalCard,
-        ...(isHovered ? styles.proposalCardHover : {}),
-      }}
-      onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <p style={styles.proposalCandidateName}>
-        Candidato(a): <strong>{proposal.speech.candidato.nome_urna}</strong>
-      </p>
-
-      {/* Propostas em lista */}
-      <ul style={styles.proposalList}>
-        {proposalTexts.map((text, i) => (
-          <li key={i}>{text}</li>
-        ))}
-      </ul>
-
-      <p style={styles.clickHint}>Clique para assistir o discurso</p>
-    </div>
-  );
+    );
 };
 
-// --- Componente Modal do Vídeo ---
-const VideoModal = ({ currentVideo, onClose }) => {
-  const { youtubeId, startTime, debateTitle } = currentVideo;
-  const [isCloseHovered, setIsCloseHovered] = useState(false);
-
-  if (!youtubeId) {
-    return null;
-  }
-
-  // URL para embed com o parâmetro 'start' para o tempo exato
-  const embedUrl = `https://www.youtube.com/embed/${youtubeId}?start=${startTime}&autoplay=1`;
-
-  return (
-    <div style={styles.modalOverlay} onClick={onClose}>
-      <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-        <div style={styles.modalHeader}>
-          <h3 style={styles.modalTitle}>{debateTitle}</h3>
-          <button
-            style={{
-              ...styles.closeButton,
-              ...(isCloseHovered ? styles.closeButtonHover : {}),
-            }}
-            onClick={onClose}
-            onMouseEnter={() => setIsCloseHovered(true)}
-            onMouseLeave={() => setIsCloseHovered(false)}
-          >
-            ✕
-          </button>
-        </div>
-        <iframe
-          style={styles.modalIframe}
-          src={embedUrl}
-          title={`YouTube video player: ${debateTitle}`}
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
-      </div>
-    </div>
-  );
-};
-
-// --- Estilos Básicos (Adicionado estilo de erro) ---
-const styles = {
-  container: {
-    padding: "20px",
-    fontFamily: "Arial, sans-serif",
-    maxWidth: "100%",
-    margin: "0 auto",
-  },
-  mainContent: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "20px",
-    maxWidth: "1200px",
-    margin: "0 auto",
-  },
-  candidatesSection: {
-    flex: "0 0 auto",
-  },
-  candidatesList: {
-    maxHeight: "300px",
-    overflowY: "auto",
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-  },
-  candidateCard: {
-    border: "2px solid #ddd",
-    borderRadius: "8px",
-    padding: "15px",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    boxShadow: "2px 2px 5px rgba(0,0,0,0.05)",
-    backgroundColor: "#fff",
-  },
-  candidateCardActive: {
-    borderColor: "#0056b3",
-    backgroundColor: "#f0f7ff",
-  },
-  candidateCardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  candidateName: {
-    fontWeight: "bold",
-    fontSize: "1.1em",
-    color: "#0056b3",
-  },
-  proposalCount: {
-    fontSize: "0.9em",
-    color: "#666",
-    backgroundColor: "#f0f0f0",
-    padding: "5px 10px",
-    borderRadius: "15px",
-  },
-  proposalsSection: {
-    flex: "1 1 auto",
-    overflow: "hidden",
-    display: "flex",
-    flexDirection: "column",
-  },
-  proposalsList: {
-    overflowY: "auto",
-    flex: "1 1 auto",
-  },
-  proposalCard: {
-    border: "1px solid #ddd",
-    borderRadius: "8px",
-    padding: "20px",
-    marginBottom: "15px",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    boxShadow: "2px 2px 5px rgba(0,0,0,0.05)",
-    backgroundColor: "#fff",
-    width: "100%",
-  },
-  proposalCardHover: {
-    backgroundColor: "#f9f9f9",
-    transform: "translateY(-2px)",
-    boxShadow: "4px 4px 10px rgba(0,0,0,0.1)",
-  },
-  proposalCandidateName: {
-    fontWeight: "normal",
-    fontSize: "1.1em",
-    color: "#0056b3",
-    marginBottom: "10px",
-  },
-  proposalList: {
-    listStyleType: "disc",
-    paddingLeft: "20px",
-    margin: "10px 0",
-    fontSize: "1em",
-  },
-  clickHint: {
-    marginTop: "15px",
-    fontSize: "0.9em",
-    color: "#666",
-    fontStyle: "italic",
-    textAlign: "center",
-    borderTop: "1px solid #eee",
-    paddingTop: "10px",
-  },
-  emptyMessage: {
-    padding: "20px",
-    textAlign: "center",
-    color: "#666",
-    fontStyle: "italic",
-  },
-  modalOverlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.75)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000,
-    padding: "20px",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderRadius: "12px",
-    maxWidth: "90vw",
-    maxHeight: "90vh",
-    width: "800px",
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden",
-  },
-  modalHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "15px 20px",
-    borderBottom: "1px solid #eee",
-    backgroundColor: "#f9f9f9",
-  },
-  modalTitle: {
-    margin: 0,
-    fontSize: "1.2em",
-    color: "#333",
-    flex: 1,
-  },
-  closeButton: {
-    background: "none",
-    border: "none",
-    fontSize: "24px",
-    cursor: "pointer",
-    color: "#666",
-    padding: "0",
-    width: "30px",
-    height: "30px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "4px",
-    transition: "all 0.2s",
-  },
-  closeButtonHover: {
-    backgroundColor: "#f0f0f0",
-    color: "#333",
-  },
-  modalIframe: {
-    width: "100%",
-    aspectRatio: "16 / 9",
-    border: "none",
-  },
-  loading: {
-    padding: "50px",
-    textAlign: "center",
-    fontSize: "1.5em",
-    color: "#0056b3",
-  },
-  error: {
-    padding: "50px",
-    textAlign: "center",
-    fontSize: "1.5em",
-    color: "#d9534f",
-    backgroundColor: "#fbe2e1",
-    border: "1px solid #d9534f",
-  },
-};
+export default HomePage;
