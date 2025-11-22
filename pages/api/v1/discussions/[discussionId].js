@@ -23,7 +23,7 @@ export default async function handler(req, res) {
         // Query Cypher: Encontra todos os discursos que pertencem a uma DISCUSSAO, 
         // e anexa todos os metadados de Pergunta, Resposta, Orador e Tema.
         const cypherQuery = `
-            MATCH (disc:DISCUSSAO {discussion_id: toInteger($discussionId)})
+            MATCH (disc:DISCUSSAO {discussion_id: $discussionId})
             // Encontra todos os discursos na discussão
             MATCH (s:Speech)-[:FAZ_PARTE_DE]->(disc)
             // Orador
@@ -32,14 +32,14 @@ export default async function handler(req, res) {
             // Info do Debate (para obter o youtube_id)
             MATCH (s)-[:TEM_DISCURSO]-(d:Debate)
 
-            // Info de Pergunta (se for uma pergunta)
-            OPTIONAL MATCH (s)-[:EH_PERGUNTA]->(p:PERGUNTA)-[:DIRECIONADA_A]->(ca:Candidato)
-
             // Info de Resposta (se for uma resposta a outra fala)
             OPTIONAL MATCH (s)-[r:RESPONDEU_A]->(sp:Speech)
 
             // Info de TEMA (pode ser abordado em qualquer fala)
             OPTIONAL MATCH (s)-[:ABORDOU_TEMA]->(t:TEMA)
+
+            // Info de PROPOSTAS feitas
+            OPTIONAL MATCH (s)-[:CONTEM_PROPOSTA]-(pr:Proposal)
 
             // Retorna a linha do tempo sequencial
             RETURN 
@@ -62,16 +62,19 @@ export default async function handler(req, res) {
                 t.nome AS tema_abordado,
                 d.debate_id AS debate_id,
                 d.title AS debate_title,
+                s.resumo AS resumo,
                 
                 // Dados da Pergunta
-                p IS NOT NULL AS eh_pergunta,
-                ca.nome AS alvo_nome,
+                // Considera pergunta quando existia nó PERGUNTA ou quando Speech tem propriedades de alvo
+                (s.question IS NOT NULL) AS eh_pergunta,
+                s.question AS pergunta,
                 
                 // Dados da Resposta
                 r IS NOT NULL AS eh_resposta,
                 r.score AS score_relevancia,
                 r.justification AS justificativa_relevancia,
-                sp.speech_id AS respondeu_a_speech_id
+                sp.speech_id AS respondeu_a_speech_id,
+                pr.text AS propostas
             ORDER BY start_time ASC
         `;
 
@@ -80,6 +83,7 @@ export default async function handler(req, res) {
         const discussion_timeline = result.records.map(record => ({
             speech_id: record.get("speech_id"),
             text: record.get("text"),
+            resumo: record.get("resumo") || null,
             start_time: record.get("start_time"),
             end_time: record.get("end_time"),
             orador: {
@@ -94,14 +98,15 @@ export default async function handler(req, res) {
             },
             interacao: {
                 eh_pergunta: record.get("eh_pergunta"),
-                alvo_nome: record.get("alvo_nome") || null,
                 eh_resposta: record.get("eh_resposta"),
                 respondeu_a_speech_id: record.get("respondeu_a_speech_id") || null,
                 relevancia: record.get("eh_resposta") ? {
                     score: record.get("score_relevancia"),
                     justificativa: record.get("justificativa_relevancia"),
                 } : null,
-            }
+            },
+            propostas: record.get("propostas"),
+            pergunta: record.get("pergunta")
         }));
 
         res.status(200).json(discussion_timeline);
