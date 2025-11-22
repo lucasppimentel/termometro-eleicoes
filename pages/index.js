@@ -1,5 +1,3 @@
-// pages/index.js
-
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 // Importação de ícones Lucide

@@ -24,17 +24,16 @@ export default async function handler(req, res) {
         // associadas e coleta os dados em uma estrutura JSON limpa.
         const cypherQuery = `
             MATCH (d:Debate {debate_id: $debateId})
-            MATCH (d)-[:TEM_DISCURSO]->(sp:Speech)-[:EH_PERGUNTA]->(p:PERGUNTA)
+            MATCH (d)-[:TEM_DISCURSO]->(sp:Speech)
             MATCH (sp)<-[:PROFERIU]-(cp:Candidato)
-            MATCH (p)-[:DIRECIONADA_A]->(ca:Candidato)
+            MATCH (sp)-[:FAZ_PARTE_DE]->(disc:DISCUSSAO)
 
             OPTIONAL MATCH (sp)-[:ABORDOU_TEMA]->(t:TEMA)
-            OPTIONAL MATCH (sp)-[:FAZ_PARTE_DE]->(disc:DISCUSSAO)
 
             OPTIONAL MATCH (sr:Speech)-[r:RESPONDEU_A]->(sp)
             OPTIONAL MATCH (sr)<-[:PROFERIU]-(cr:Candidato)
 
-            WITH sp, cp, ca, t, disc,
+            WITH sp, cp, t, disc,
                 COLLECT({
                     resposta_speech_id:
                         CASE 
@@ -55,35 +54,26 @@ export default async function handler(req, res) {
                 }) AS respostas
 
             RETURN {
-                pergunta_speech_id:
-                    CASE 
-                        WHEN sp.speech_id IS NULL THEN NULL
-                        ELSE toFloat(sp.speech_id)
-                    END,
+                speech_id: sp.speech_id,
+                pergunta: sp.question,
 
-                pergunta_text: sp.text,
+                text: sp.text,
 
-                pergunta_start:
+                start:
                     CASE 
                         WHEN sp.start IS NULL THEN NULL
                         ELSE toFloat(sp.start)
                     END,
 
-                pergunta_end:
+                end:
                     CASE 
                         WHEN sp.end IS NULL THEN NULL
                         ELSE toFloat(sp.end)
                     END,
 
-                candidato_perguntou: cp.nome,
-                candidato_alvo: ca.nome,
+                candidato: cp.nome,
                 tema: t.nome,
-
-                discussion_id:
-                    CASE 
-                        WHEN disc.discussion_id IS NULL THEN NULL
-                        ELSE toFloat(disc.discussion_id)
-                    END,
+                discussion_id: disc.discussion_id,
 
                 respostas: [r IN respostas WHERE r.resposta_speech_id IS NOT NULL]
             } AS discussion

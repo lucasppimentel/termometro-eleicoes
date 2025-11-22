@@ -13,6 +13,38 @@ const safeGetNumber = (value) => {
     return typeof value === 'object' && value.low !== undefined ? value.low : value;
 };
 
+// Tenta converter diferentes formatos de lista string para array.
+const parseProposals = (val) => {
+    console.log("Parsing proposals from value:", val);
+    if (!val && val !== "") return [];
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'object') return [val];
+
+    // Já é uma string: pode ser "['a','b']" ou '["a","b"]' ou 'a, b'
+    if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (trimmed === '[]' || trimmed === '') return [];
+
+        // Primeiro tenta JSON.parse direto
+        try {
+            return JSON.parse(trimmed);
+        } catch (e) {
+            // Tenta converter aspas simples para duplas e parsear
+            try {
+                const doubleQuoted = trimmed.replace(/'/g, '"');
+                return JSON.parse(doubleQuoted);
+            } catch (e2) {
+                // Fallback: remover colchetes e split por vírgula
+                const noBrackets = trimmed.replace(/^\[|\]$/g, '');
+                const parts = noBrackets.split(/,\s*/).map(s => s.replace(/^\s*['"]?|['"]?\s*$/g, '').trim()).filter(Boolean);
+                return parts;
+            }
+        }
+    }
+
+    return [];
+};
+
 const formatTime = (seconds) => {
     if (seconds === null) return "N/A";
     const minutes = Math.floor(seconds / 60);
@@ -34,7 +66,8 @@ const SpeechEvent = ({ speech, onSpeechClick }) => {
     const { interacao, orador, texto, start_time, end_time, contexto } = speech;
     
     // Define o estilo baseado no tipo de interação
-    let type = interacao.eh_pergunta ? 'pergunta' : 
+    const isQuestion = interacao.eh_pergunta || !!interacao.alvo_nome || !!interacao.alvo_titulo_eleitoral;
+    let type = isQuestion ? 'pergunta' : 
                interacao.eh_resposta ? 'resposta' : 
                'replicas';
     
@@ -80,18 +113,46 @@ const SpeechEvent = ({ speech, onSpeechClick }) => {
                 
                 {/* Alvo e Tema */}
                 <div className="text-sm text-gray-600 my-1">
-                    {interacao.eh_pergunta && interacao.alvo_nome && (
-                        <span className="font-medium mr-4">ALVO: {interacao.alvo_nome}</span>
+                    {isQuestion && (interacao.alvo_nome || interacao.alvo_titulo_eleitoral) && (
+                        <span className="font-medium mr-4">ALVO: {interacao.alvo_nome || interacao.alvo_titulo_eleitoral}</span>
                     )}
                     {contexto.tema_abordado && (
                         <span className="text-xs bg-gray-200 px-2 py-0.5 rounded-full">TEMA: {contexto.tema_abordado}</span>
                     )}
                 </div>
 
-                {/* Texto da Fala */}
-                <p className="mt-2 text-base italic leading-relaxed text-gray-700">
-                    "{speech.text}"
-                </p>
+                {/* Texto / Resumo / Propostas (substitui transcrição) */}
+                {interacao.eh_pergunta ? (
+                    <p className="mt-2 text-base italic leading-relaxed text-gray-700">
+                        <strong>Perguntou:</strong> {speech.pergunta}
+                    </p>
+                ) : (
+                    <div className="mt-2">
+                        <p className="text-base font-medium text-gray-800">
+                            <strong>Resumo da fala:</strong> {speech.resumo || 'N/A'}
+                        </p>
+
+                        {/* Lista de propostas, se existir (suporta `proposals` ou `propostas`, inclusive stringified lists) */}
+                        {(() => {
+                            const raw = speech.proposals ?? speech.propostas ?? null;
+                            const proposalsList = parseProposals(raw);
+                            if (!proposalsList || proposalsList.length === 0) return null;
+
+                            return (
+                                <div className="mt-3">
+                                    <p className="font-semibold text-sm text-gray-700">Propôs:</p>
+                                    <ul className="list-disc list-inside mt-1 text-sm text-gray-700">
+                                        {proposalsList.map((p, i) => (
+                                            <li key={(p && (p.id || p.proposal_id)) || i}>
+                                                {typeof p === 'string' ? p : (p.title || p.nome || p.name || p.description || JSON.stringify(p))}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                )}
 
                 {/* Pontuação de Relevância (Apenas para Respostas) */}
                 {interacao.eh_resposta && interacao.relevancia && (
@@ -166,15 +227,6 @@ const DiscussionViewer = () => {
     // Efeito para carregar o Tailwind e a Fonte Inter apenas uma vez no HEAD do documento.
     // Isso é a correção para o problema de estilo.
     useEffect(() => {
-        // 1. Carregar Tailwind CSS CDN
-        // const tailwindScriptId = 'tailwind-cdn-script';
-        // if (!document.getElementById(tailwindScriptId)) {
-        //     const script = document.createElement('script');
-        //     script.src = "https://cdn.tailwindcss.com";
-        //     script.id = tailwindScriptId;
-        //     document.head.appendChild(script);
-        // }
-
         // 2. Carregar Fonte Inter (CSS Link)
         const fontLinkTagId = 'inter-font-link';
         if (!document.getElementById(fontLinkTagId)) {
@@ -243,6 +295,21 @@ const DiscussionViewer = () => {
 
     if (error) {
         return <div className="p-8 text-center text-red-600 bg-red-100 rounded-lg shadow-inner">Erro ao carregar: {error}</div>;
+    }
+
+    // Filtra discussões que têm ao menos um candidato identificado
+    // Exclui discussões onde todos os oradores são "NÃO CANDIDATO" com titulo_eleitoral === 0
+    const hasIdentifiedCandidate = discussionData.some(speech => 
+        speech.orador.nome !== "NÃO CANDIDATO"
+    );
+
+    if (!hasIdentifiedCandidate) {
+        return (
+            <div className="p-8 text-center text-yellow-600 bg-yellow-100 rounded-lg shadow-inner">
+                <p className="font-semibold">Discussão não disponível</p>
+                <p className="text-sm mt-2">Esta discussão não contém candidatos identificados.</p>
+            </div>
+        );
     }
 
     return (

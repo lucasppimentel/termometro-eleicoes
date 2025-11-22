@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import '../assets/styles/globals.css';
+import Navbar from '../components/Navbar';
 
 function MyApp({ Component, pageProps }) {
   return (
@@ -14,6 +15,7 @@ function MyApp({ Component, pageProps }) {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
       </Head>
 
+      <Navbar />
       <Component {...pageProps} />
     </>
   );
