@@ -61,14 +61,14 @@ const BattleArena = ({ timeline: incomingTimeline }) => {
     }, [incomingTimeline]);
 
     // Dimensions
-    const size = 600;
+    const size = 480; // Reduced by 20% from 600
     const center = size / 2;
-    const radius = 200;
+    const radius = 160; // Reduced by 20% from 200
 
     // Autoplay handled after processedTimeline is computed
 
     // --- DERIVED DATA ---
-    // If events don't include `target_nome` but include `respondeu_a_speech_id`, resolve target speaker name
+    // If events don\'t include `target_nome` but include `respondeu_a_speech_id`, resolve target speaker name
     const processedTimeline = useMemo(() => {
         const byId = new Map(timeline.map(ev => [ev.speech_id, ev]));
         return timeline.map(ev => {
@@ -129,10 +129,10 @@ const BattleArena = ({ timeline: incomingTimeline }) => {
     // (autoplay handles stepping; manual controls removed)
 
     return (
-        <div className="w-full max-w-4xl mx-auto bg-slate-900 text-white rounded-xl overflow-hidden shadow-2xl border border-slate-700">
+        <div className="w-full max-w-xl mx-auto bg-slate-900 text-white rounded-xl overflow-hidden shadow-2xl border border-slate-700"> {/* Adjusted max-w-4xl to max-w-xl */}
 
             {/* ARENA (SVG) */}
-            <div className="relative w-full h-[600px] bg-slate-950 flex items-center justify-center overflow-hidden">
+            <div className="relative w-full h-[480px] bg-slate-950 flex items-center justify-center overflow-hidden"> {/* Adjusted height to match size */}
                 {/* Background Grid Effect */}
                 <div className="absolute inset-0 opacity-10" 
                      style={{ backgroundImage: 'radial-gradient(circle, #4f46e5 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
@@ -224,15 +224,15 @@ const BattleArena = ({ timeline: incomingTimeline }) => {
                             <g key={node.name} className="transition-all duration-300">
                                 {/* Ping Effect when speaking */}
                                 {isSpeaking && (
-                                    <circle cx={node.x} cy={node.y} r="40" fill="none" stroke="#6366f1" strokeWidth="1" opacity="0.5">
-                                        <animate attributeName="r" from="30" to="60" dur="1.5s" repeatCount="indefinite" />
+                                    <circle cx={node.x} cy={node.y} r="32" fill="none" stroke="#6366f1" strokeWidth="1" opacity="0.5">
+                                        <animate attributeName="r" from="24" to="48" dur="1.5s" repeatCount="indefinite" /> {/* Adjusted r values */}
                                         <animate attributeName="opacity" from="0.6" to="0" dur="1.5s" repeatCount="indefinite" />
                                     </circle>
                                 )}
 
                                 {/* Main Circle */}
                                 <circle 
-                                    cx={node.x} cy={node.y} r="30" 
+                                    cx={node.x} cy={node.y} r="24" 
                                     fill={isSpeaking ? "#4f46e5" : isTarget ? "#334155" : "#1e293b"}
                                     stroke={isSpeaking ? "#818cf8" : isTarget ? "#94a3b8" : "#475569"}
                                     strokeWidth={isSpeaking ? 4 : 2}
@@ -251,9 +251,9 @@ const BattleArena = ({ timeline: incomingTimeline }) => {
 
                                 {/* Speaking Icon */}
                                 {isSpeaking && (
-                                    <foreignObject x={node.x - 10} y={node.y - 50} width="20" height="20">
+                                    <foreignObject x={node.x - 8} y={node.y - 40} width="16" height="16"> {/* Adjusted x, y, width, height */}
                                         <div className="flex justify-center">
-                                            <Zap className="w-5 h-5 text-yellow-400 fill-current" />
+                                            <Zap className="w-4 h-4 text-yellow-400 fill-current" /> {/* Adjusted w, h */}
                                         </div>
                                     </foreignObject>
                                 )}
