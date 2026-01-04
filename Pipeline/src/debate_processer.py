@@ -124,6 +124,7 @@ class DebateProcesser:
         database: Neo4jDatabase,
         sample_length: int = DEFAULT_SAMPLE_LENGTH,
         debate_start: int = DEFAULT_DEBATE_START,
+        manual_identification: bool = False,
     ) -> None:
         """
         Inicializa o processador de debates.
@@ -141,11 +142,13 @@ class DebateProcesser:
         self.video_id: str = video_id
         self.folder_path: str = f"./Downloads/{self.video_id}"
         self.speech_max_pause: int = DEFAULT_SPEECH_MAX_PAUSE
+        self.manual_identification = manual_identification
 
         # Dados Intermediários
         self.transcript: Optional[pd.DataFrame] = None
         self.sample: Optional[str] = None
         self.description: Optional[Dict[str, Any]] = None
+        self.identification_failed: bool = False
         self.df_dia: Optional[pd.DataFrame] = None
         self.df_identified: Optional[pd.DataFrame] = None
         self.debate: Optional[Dict[str, Any]] = None
@@ -285,31 +288,12 @@ class DebateProcesser:
 
 
     def identify_speakers(self) -> None:
-        """Identifica os participantes do debate usando LLM."""
-        # OpenAI call para identificar candidatos em trechos
-        gpt_5 = init_chat_model(
-            model="gpt-5",
-            model_provider="openai",
-            reasoning={"effort": "medium"},
-        )
+        """
+        Identifica os participantes do debate.
+        Pode falhar silenciosamente e delegar para human-in-the-loop.
+        """
 
-        chain = identifier_template | gpt_5
-        response = chain.invoke({"transcription_segment": self.sample})
-
-        # Output parsing -> Candidato e trecho identificado
-        pattern = r'Palestrante:\s([^\n]+)\s+Texto:\s"([^"]+)"'
-        matches = re.findall(pattern, response.content[0]["text"])
-        self.df_identified = pd.DataFrame(
-            data=matches, columns=["Candidato", "Trecho"]
-        )
-        self.df_identified = self.df_identified.loc[
-            self.df_identified["Trecho"].str.len() > MIN_TEXT_LENGTH
-        ]
-
-        identified = self.df_identified["Candidato"].drop_duplicates()
-        logger.info(f"Identified speakers: {identified.tolist()}")
-
-        # Lista de candidatos no banco de dados que concorreram ao cargo e estado do debate
+        # Sempre carregar candidatos válidos do banco
         query_candidatos = """
         MATCH (e:Eleicao) <-[:DISPUTA]- (c:Candidato) -[:CONCORRE_AO]-> (cg:Cargo)
             WHERE   e.uf = $estado
@@ -329,30 +313,67 @@ class DebateProcesser:
                         municipio=self.debate["municipio"],
                     )
 
-                    result_candidatos: List[str] = []
-                    result_documentos: Dict[str, str] = {}
+                    self.result_candidatos = []
+                    self.result_documentos = {}
+
                     for record in result:
                         nome = record["nome_urna"]
-                        documento = str(record["documento"])
-                        result_candidatos.append(nome)
-                        result_documentos[nome] = documento
+                        doc = str(record["documento"])
+                        self.result_candidatos.append(nome)
+                        self.result_documentos[nome] = doc
+                        
                 break
             except Exception as e:
                 logger.error(f"Erro ao consultar o banco de dados: {e}")
                 tentativas -= 1
+                
 
-        # Salvar nomes originais identificados pelo LLM antes do match
-        identified_by_llm = self.df_identified["Candidato"].drop_duplicates().tolist()
+        if self.manual_identification:
+            logger.info("Manual identification enforced. Skipping LLM speaker identification.")
+            self.identification_failed = True
+            return
 
-        # Encontrar a melhor correspondência dos nomes e corrigir o DataFrame
-        def get_match_and_document(llm_name: str) -> pd.Series:
-            matched_name = find_best_match(llm_name, result_candidatos)
-            matched_document = result_documentos.get(matched_name, None)
-            return pd.Series([matched_name, matched_document])
+        # ===== LLM IDENTIFICATION =====
+        gpt_5 = init_chat_model(
+            model="gpt-5",
+            model_provider="openai",
+            reasoning={"effort": "medium"},
+        )
+
+        chain = identifier_template | gpt_5
+        response = chain.invoke({"transcription_segment": self.sample})
+
+        pattern = r'Palestrante:\s([^\n]+)\s+Texto:\s"([^"]+)"'
+        matches = re.findall(pattern, response.content[0]["text"])
+
+        self.df_identified = pd.DataFrame(matches, columns=["Candidato", "Trecho"])
+        self.df_identified = self.df_identified.loc[
+            self.df_identified["Trecho"].str.len() > MIN_TEXT_LENGTH
+        ]
+
+        if self.df_identified["Candidato"].nunique() < 2:
+            logger.warning("Less than two speakers identified. Falling back to manual identification.")
+            self.identification_failed = True
+            self.df_identified = None
+            return
+
+        # Match com banco
+        def match_candidate(llm_name: str) -> pd.Series:
+            matched = find_best_match(llm_name, self.result_candidatos)
+            return pd.Series([matched, self.result_documentos.get(matched)])
 
         self.df_identified[["Candidato", "Titulo_Eleitoral"]] = (
-            self.df_identified["Candidato"].apply(get_match_and_document)
+            self.df_identified["Candidato"].apply(match_candidate)
         )
+
+        valid = self.df_identified["Candidato"].notna().sum()
+        if valid < 2:
+            logger.warning("LLM candidates not matched in DB. Falling back to manual identification.")
+            self.identification_failed = True
+            self.df_identified = None
+
+            return
+
         self.df_identified["Trecho_ID"] = self.df_identified.index
 
         # Verificar candidatos que foram correspondidos (encontrados na base)
@@ -369,8 +390,8 @@ class DebateProcesser:
         if len(matched_candidates) == 0:
             error_msg = (
                 f"Nenhum candidato foi encontrado na base de dados.\n"
-                f"Candidatos identificados pelo LLM: {identified_by_llm}\n"
-                f"Candidatos disponíveis na base: {result_candidatos if result_candidatos else 'Nenhum candidato encontrado para os critérios especificados'}\n"
+                f"Candidatos identificados pelo LLM: {self.identified_by_llm}\n"
+                f"Candidatos disponíveis na base: {self.result_candidatos if self.result_candidatos else 'Nenhum candidato encontrado para os critérios especificados'}\n"
                 f"Critérios de busca: Cargo={self.debate['cargo']}, "
                 f"Estado={self.debate['estado']}, Município={self.debate['municipio']}"
             )
@@ -467,39 +488,57 @@ class DebateProcesser:
         if "Titulo_Eleitoral" in self.df_dia.columns:
             self.df_dia = self.df_dia.drop(columns=["Titulo_Eleitoral"])
 
-        # Nesse ponto, `transcript` e `df_dia` são Data Frames com trechos, mas os inícios e fins
-        # não coincidem exatamente.
-        # Abaixo é feito um merge nas linhas onde os tempos de sobrepõem.
-        self.transcript = self.transcript.rename(columns={"start": "Transcription_Start", "end": "Transcription_End", "text": "Transcription_Text"})
-        self.transcript["key_tmp"] = 1
-        self.df_dia["key_tmp"] = 1
+        if self.identification_failed:
+            logger.warning("Speaker identification failed. Using manual assignment.")
 
-        merge_tmp = pd.merge(left=self.df_dia, right=self.transcript[["Transcription_Start", "Transcription_End", "key_tmp", "Titulo_Eleitoral", "Candidato"]], how="left", on="key_tmp")
+            self.df_dia = self._manual_assign_speakers(self.df_dia)
 
-        mask = (
-            (merge_tmp["Diarizacao_Start"] <= merge_tmp["Transcription_End"]) & 
-            (merge_tmp["Diarizacao_End"] >= merge_tmp["Transcription_Start"]) & 
-            (~merge_tmp["Candidato"].isnull())
-        )
-        merge_tmp = merge_tmp.loc[mask]
-        merge_tmp["Overlap"] = np.maximum(
-            0,
-            np.minimum(merge_tmp["Diarizacao_End"], merge_tmp["Transcription_End"]) - 
-            np.maximum(merge_tmp["Diarizacao_Start"], merge_tmp["Transcription_Start"])
-        )
-        merge_tmp["Speech_Duration"] = merge_tmp["Diarizacao_End"] - merge_tmp["Diarizacao_Start"]
-        merge_tmp["Proportion_Overlap"] = merge_tmp["Overlap"] / merge_tmp["Speech_Duration"]
-        merge_tmp = merge_tmp.loc[merge_tmp["Proportion_Overlap"] >= 0.1]
+            self.transcript = self.transcript.rename(columns={"start": "Transcription_Start", "end": "Transcription_End", "text": "Transcription_Text"})
+            self.transcript["key_tmp"] = 1
+            self.df_dia["key_tmp"] = 1
 
-        # Determinar o candidato mais frequentemente associado a cada Speaker_ID
-        merge_tmp = merge_tmp.groupby("Speaker_ID")["Candidato"].apply(lambda x: x.mode()[0])
-        merge_tmp = merge_tmp.to_dict()
+            self.df_identified = self.df_dia[["Candidato", "Titulo_Eleitoral"]].drop_duplicates()
+        else:
+            # Nesse ponto, `transcript` e `df_dia` são Data Frames com trechos, mas os inícios e fins
+            # não coincidem exatamente.
+            # Abaixo é feito um merge nas linhas onde os tempos de sobrepõem.
+            self.transcript = self.transcript.rename(columns={"start": "Transcription_Start", "end": "Transcription_End", "text": "Transcription_Text"})
+            self.transcript["key_tmp"] = 1
+            self.df_dia["key_tmp"] = 1
 
-        # Atualizar candidato
-        documentos = self.transcript[["Candidato", "Titulo_Eleitoral"]].drop_duplicates().set_index("Candidato")["Titulo_Eleitoral"].to_dict()
-        self.df_dia["Candidato"] = self.df_dia["Speaker_ID"].replace(merge_tmp)
-        self.df_dia["Titulo_Eleitoral"] = self.df_dia["Candidato"].replace(documentos)
-        del merge_tmp
+            required_cols = {"Candidato", "Titulo_Eleitoral"}
+            if not required_cols.issubset(self.transcript.columns):
+                raise RuntimeError(
+                    "Identificação automática esperada, mas transcript não contém "
+                    "'Candidato' e 'Titulo_Eleitoral'."
+                )
+
+            merge_tmp = pd.merge(left=self.df_dia, right=self.transcript[["Transcription_Start", "Transcription_End", "key_tmp", "Titulo_Eleitoral", "Candidato"]], how="left", on="key_tmp")
+
+            mask = (
+                (merge_tmp["Diarizacao_Start"] <= merge_tmp["Transcription_End"]) & 
+                (merge_tmp["Diarizacao_End"] >= merge_tmp["Transcription_Start"]) & 
+                (~merge_tmp["Candidato"].isnull())
+            )
+            merge_tmp = merge_tmp.loc[mask]
+            merge_tmp["Overlap"] = np.maximum(
+                0,
+                np.minimum(merge_tmp["Diarizacao_End"], merge_tmp["Transcription_End"]) - 
+                np.maximum(merge_tmp["Diarizacao_Start"], merge_tmp["Transcription_Start"])
+            )
+            merge_tmp["Speech_Duration"] = merge_tmp["Diarizacao_End"] - merge_tmp["Diarizacao_Start"]
+            merge_tmp["Proportion_Overlap"] = merge_tmp["Overlap"] / merge_tmp["Speech_Duration"]
+            merge_tmp = merge_tmp.loc[merge_tmp["Proportion_Overlap"] >= 0.1]
+
+            # Determinar o candidato mais frequentemente associado a cada Speaker_ID
+            merge_tmp = merge_tmp.groupby("Speaker_ID")["Candidato"].apply(lambda x: x.mode()[0])
+            merge_tmp = merge_tmp.to_dict()
+
+            # Atualizar candidato
+            documentos = self.transcript[["Candidato", "Titulo_Eleitoral"]].drop_duplicates().set_index("Candidato")["Titulo_Eleitoral"].to_dict()
+            self.df_dia["Candidato"] = self.df_dia["Speaker_ID"].replace(merge_tmp)
+            self.df_dia["Titulo_Eleitoral"] = self.df_dia["Candidato"].replace(documentos)
+            del merge_tmp
 
         # Tanto a diarização quando a transcrição foram feitas em segmentos.
         # Agora é necessário juntar os segmentos para ter os discursos completo de cada candidato.
@@ -1302,6 +1341,7 @@ class DebateProcesser:
 
         # Prepara o DataFrame para garantir tipos de dados corretos para Cypher
         speeches_df = self.speeches.copy()
+        speeches_df = speeches_df.loc[speeches_df["Speech"].notna()]
         speeches_df['ID_Discussao'] = speeches_df['ID_Discussao'].replace({np.nan: None})
         speeches_df['question_idx'] = speeches_df['question_idx'].replace({pd.NA: None, np.nan: None})
         
@@ -1373,11 +1413,14 @@ class DebateProcesser:
                     else None
                 )
                 relevance_justification = row.get("relevance_justification")
-                question_idx = (
-                    int(speeches_df.loc[row["question_idx"], "Speech"])
-                    if pd.notna(row["question_idx"])
-                    else None
-                )
+                if row["question_idx"] not in speeches_df.index:
+                    question_idx = None
+                else:
+                    question_idx = (
+                        int(speeches_df.loc[row["question_idx"], "Speech"])
+                        if pd.notna(row["question_idx"]) and row.get("question_idx") is not None
+                        else None
+                    )
                 question_speech_id = (
                     f"{debate_id}_{question_idx}" if question_idx is not None else None
                 )
@@ -1439,3 +1482,57 @@ class DebateProcesser:
                 )
 
             logger.info("Ingestão de dados de Discussão concluída.")
+    
+    def _manual_assign_speakers(self, df_dia: pd.DataFrame) -> pd.DataFrame:
+        """
+        Permite que o usuário associe manualmente Speaker_ID → Candidato,
+        exibindo timestamps para auxiliar a identificação.
+        """
+
+        print("\n=== IDENTIFICAÇÃO MANUAL DE SPEAKERS ===\n")
+        print("Candidatos disponíveis:")
+        for c in self.result_candidatos:
+            print(f" - {c}")
+        print(" - n  (não é candidato)\n")
+
+        speaker_map = {}
+
+        for speaker_id in sorted(df_dia["Speaker_ID"].unique()):
+            # Selecionar trechos desse speaker
+            df_spk = df_dia[df_dia["Speaker_ID"] == speaker_id]
+
+            print("\n" + "=" * 60)
+            print(f"Speaker_ID: {speaker_id}")
+            print("Trechos associados (timestamps):")
+
+            # Mostrar apenas alguns exemplos para não poluir o terminal
+            for _, row in df_spk.head(5).iterrows():
+                inicio = row["Diarizacao_Start"]
+                fim = row["Diarizacao_End"]
+                print(f"  - {inicio} → {fim}")
+
+            if len(df_spk) > 5:
+                print(f"  ... (+{len(df_spk) - 5} trechos)")
+
+            while True:
+                sys.stdout.flush()
+
+                nome = input(
+                    "\nDigite o nome do candidato exatamente como listado "
+                    "(ou 'n' se não for candidato): "
+                ).strip()
+
+                if nome in self.result_candidatos:
+                    speaker_map[speaker_id] = nome
+                    break
+                elif nome.lower() == "n":
+                    speaker_map[speaker_id] = None
+                    break
+                else:
+                    print("❌ Nome inválido. Tente novamente.")
+
+        # Aplicar mapeamento
+        df_dia["Candidato"] = df_dia["Speaker_ID"].map(speaker_map)
+        df_dia["Titulo_Eleitoral"] = df_dia["Candidato"].map(self.result_documentos)
+
+        return df_dia
