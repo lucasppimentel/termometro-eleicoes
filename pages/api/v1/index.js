@@ -36,7 +36,6 @@ const typeDefs = `#graphql
     discursos: [fala!]! @relationship(type: "PROFERIU", direction: OUT)
     propostas: [proposal!]! @relationship(type: "FEZ_PROPOSTA", direction: OUT)
     debates: [debate!]! @relationship(type: "PARTICIPOU_DO_DEBATE", direction: OUT)
-    perguntas_direcionadas: [pergunta!]! @relationship(type: "DIRECIONADA_A", direction: IN)
   }
 
   type fala @node (labels: ["Speech"]) {
@@ -53,7 +52,6 @@ const typeDefs = `#graphql
     foi_respondido_por: [fala!]! @relationship(type: "RESPONDEU_A", direction: IN)
     discussoes: [discussao!]! @relationship(type: "FAZ_PARTE_DE", direction: OUT)
     temas: [tema!]! @relationship(type: "ABORDOU_TEMA", direction: OUT)
-    pergunta: [pergunta!]! @relationship(type: "EH_PERGUNTA", direction: OUT)
   }
 
   type proposal @node (labels: ["Proposta"]) {
@@ -63,22 +61,16 @@ const typeDefs = `#graphql
     discursos: [fala!]! @relationship(type: "CONTEM_PROPOSTA", direction: IN)
   }
 
-  type discussao @node (labels: ["Discussao"]) {
+  type discussao @node (labels: ["DISCUSSAO"]) {
     discussion_id: ID!
     discursos: [fala!]! @relationship(type: "FAZ_PARTE_DE", direction: IN)
     debate: [debate!]! @relationship(type: "CONTEM_DISCUSSAO", direction: IN)
   }
 
-  type tema @node (labels: ["Tema"]) {
+  type tema @node (labels: ["TEMA"]) {
     nome: ID!
     discursos: [fala!]! @relationship(type: "ABORDOU_TEMA", direction: IN)
     debates: [debate!]! @relationship(type: "ABORDOU_TEMA_DEBATE", direction: IN)
-  }
-
-  type pergunta @node (labels: ["Pergunta"]) {
-    pergunta_id: ID!
-    discursos: [fala!]! @relationship(type: "EH_PERGUNTA", direction: IN)
-    direcionada_a: [candidato!]! @relationship(type: "DIRECIONADA_A", direction: OUT)
   }
 `;
 
