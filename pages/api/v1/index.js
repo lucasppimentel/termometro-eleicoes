@@ -1,83 +1,84 @@
 import { ApolloServer } from '@apollo/server';
 import { Neo4jGraphQL } from "@neo4j/graphql";
+import { GraphQLSchema } from "graphql";
 import { getNeo4jDriver } from "../../../infra/database";
 
 // Definição completa do Schema GraphQL baseado na estrutura do banco Neo4j
 const typeDefs = `#graphql
-  type Debate @node {
+  type debate @node (labels: ["Debate"]) {
     debate_id: ID!
     title: String
     date: String
     cargo: String
     municipio: String
     estado: String
-    cargo_relacionado: [Cargo!]! @relationship(type: "REFERE_AO_CARGO", direction: OUT)
-    ano: [Ano!]! @relationship(type: "OCORRE_NO_ANO", direction: OUT)
-    candidatos: [Candidato!]! @relationship(type: "PARTICIPOU_DO_DEBATE", direction: IN)
-    discursos: [Speech!]! @relationship(type: "TEM_DISCURSO", direction: OUT)
-    discussoes: [Discussao!]! @relationship(type: "CONTEM_DISCUSSAO", direction: OUT)
-    temas: [Tema!]! @relationship(type: "ABORDOU_TEMA_DEBATE", direction: OUT)
+    cargo_relacionado: [cargo!]! @relationship(type: "REFERE_AO_CARGO", direction: OUT)
+    ano: [ano!]! @relationship(type: "OCORRE_NO_ANO", direction: OUT)
+    candidatos: [candidato!]! @relationship(type: "PARTICIPOU_DO_DEBATE", direction: IN)
+    discursos: [fala!]! @relationship(type: "TEM_DISCURSO", direction: OUT)
+    discussoes: [discussao!]! @relationship(type: "CONTEM_DISCUSSAO", direction: OUT)
+    temas: [tema!]! @relationship(type: "ABORDOU_TEMA_DEBATE", direction: OUT)
   }
 
-  type Cargo @node {
+  type cargo @node (labels: ["Cargo"]) {
     ds_cargo: String!
-    debates: [Debate!]! @relationship(type: "REFERE_AO_CARGO", direction: IN)
+    debates: [debate!]! @relationship(type: "REFERE_AO_CARGO", direction: IN)
   }
 
-  type Ano @node {
+  type ano @node (labels: ["Ano"]) {
     ano: Int!
-    debates: [Debate!]! @relationship(type: "OCORRE_NO_ANO", direction: IN)
+    debates: [debate!]! @relationship(type: "OCORRE_NO_ANO", direction: IN)
   }
 
-  type Candidato @node {
+  type candidato @node (labels: ["Candidato"]) @plural(value: "candidatos") {
     titulo_eleitoral: ID!
     nome: String
-    discursos: [Speech!]! @relationship(type: "PROFERIU", direction: OUT)
-    propostas: [Proposal!]! @relationship(type: "FEZ_PROPOSTA", direction: OUT)
-    debates: [Debate!]! @relationship(type: "PARTICIPOU_DO_DEBATE", direction: OUT)
-    perguntas_direcionadas: [Pergunta!]! @relationship(type: "DIRECIONADA_A", direction: IN)
+    discursos: [fala!]! @relationship(type: "PROFERIU", direction: OUT)
+    propostas: [proposal!]! @relationship(type: "FEZ_PROPOSTA", direction: OUT)
+    debates: [debate!]! @relationship(type: "PARTICIPOU_DO_DEBATE", direction: OUT)
+    perguntas_direcionadas: [pergunta!]! @relationship(type: "DIRECIONADA_A", direction: IN)
   }
 
-  type Speech @node {
+  type fala @node (labels: ["Speech"]) {
     speech_id: ID!
     text: String
     start: Float
     end: Float
     relevance_score: Float
     relevance_justification: String
-    autor: [Candidato!]! @relationship(type: "PROFERIU", direction: IN)
-    debate: [Debate!]! @relationship(type: "TEM_DISCURSO", direction: IN)
-    propostas: [Proposal!]! @relationship(type: "CONTEM_PROPOSTA", direction: OUT)
-    respondeu_a: [Speech!]! @relationship(type: "RESPONDEU_A", direction: OUT)
-    foi_respondido_por: [Speech!]! @relationship(type: "RESPONDEU_A", direction: IN)
-    discussoes: [Discussao!]! @relationship(type: "FAZ_PARTE_DE", direction: OUT)
-    temas: [Tema!]! @relationship(type: "ABORDOU_TEMA", direction: OUT)
-    pergunta: [Pergunta!]! @relationship(type: "EH_PERGUNTA", direction: OUT)
+    autor: [candidato!]! @relationship(type: "PROFERIU", direction: IN)
+    debate: [debate!]! @relationship(type: "TEM_DISCURSO", direction: IN)
+    propostas: [proposal!]! @relationship(type: "CONTEM_PROPOSTA", direction: OUT)
+    respondeu_a: [fala!]! @relationship(type: "RESPONDEU_A", direction: OUT)
+    foi_respondido_por: [fala!]! @relationship(type: "RESPONDEU_A", direction: IN)
+    discussoes: [discussao!]! @relationship(type: "FAZ_PARTE_DE", direction: OUT)
+    temas: [tema!]! @relationship(type: "ABORDOU_TEMA", direction: OUT)
+    pergunta: [pergunta!]! @relationship(type: "EH_PERGUNTA", direction: OUT)
   }
 
-  type Proposal @node {
+  type proposal @node (labels: ["Proposta"]) {
     proposal_id: ID!
     text: String
-    candidato: [Candidato!]! @relationship(type: "FEZ_PROPOSTA", direction: IN)
-    discursos: [Speech!]! @relationship(type: "CONTEM_PROPOSTA", direction: IN)
+    candidato: [candidato!]! @relationship(type: "FEZ_PROPOSTA", direction: IN)
+    discursos: [fala!]! @relationship(type: "CONTEM_PROPOSTA", direction: IN)
   }
 
-  type Discussao @node {
+  type discussao @node (labels: ["Discussao"]) {
     discussion_id: ID!
-    discursos: [Speech!]! @relationship(type: "FAZ_PARTE_DE", direction: IN)
-    debate: [Debate!]! @relationship(type: "CONTEM_DISCUSSAO", direction: IN)
+    discursos: [fala!]! @relationship(type: "FAZ_PARTE_DE", direction: IN)
+    debate: [debate!]! @relationship(type: "CONTEM_DISCUSSAO", direction: IN)
   }
 
-  type Tema @node {
+  type tema @node (labels: ["Tema"]) {
     nome: ID!
-    discursos: [Speech!]! @relationship(type: "ABORDOU_TEMA", direction: IN)
-    debates: [Debate!]! @relationship(type: "ABORDOU_TEMA_DEBATE", direction: IN)
+    discursos: [fala!]! @relationship(type: "ABORDOU_TEMA", direction: IN)
+    debates: [debate!]! @relationship(type: "ABORDOU_TEMA_DEBATE", direction: IN)
   }
 
-  type Pergunta @node {
+  type pergunta @node (labels: ["Pergunta"]) {
     pergunta_id: ID!
-    discursos: [Speech!]! @relationship(type: "EH_PERGUNTA", direction: IN)
-    direcionada_a: [Candidato!]! @relationship(type: "DIRECIONADA_A", direction: OUT)
+    discursos: [fala!]! @relationship(type: "EH_PERGUNTA", direction: IN)
+    direcionada_a: [candidato!]! @relationship(type: "DIRECIONADA_A", direction: OUT)
   }
 `;
 
@@ -91,15 +92,29 @@ async function getApolloServer() {
     // Criação do Schema do Neo4j
     const neoSchema = new Neo4jGraphQL({ 
       typeDefs, 
-      driver 
+      driver
     });
 
-    const schema = await neoSchema.getSchema();
+    let schema = await neoSchema.getSchema();
+
+    // Remove mutations do schema para garantir que apenas queries sejam permitidas
+    const mutationType = schema.getMutationType();
+    if (mutationType) {
+      // Cria um novo schema sem o tipo Mutation
+      const queryType = schema.getQueryType();
+      schema = new GraphQLSchema({
+        query: queryType,
+        // Mutation e Subscription não são incluídos - apenas leitura
+      });
+    }
+
+    // Introspection apenas em desenvolvimento
+    const isDevelopment = process.env.NODE_ENV === 'development';
 
     // Inicialização do Apollo Server
     apolloServer = new ApolloServer({ 
       schema,
-      introspection: true, // Permite introspection em desenvolvimento
+      introspection: isDevelopment, // Apenas em desenvolvimento
     });
     
     // Inicia o servidor (necessário para Apollo Server v5)
@@ -153,8 +168,22 @@ export default async function graphqlHandler(req, res) {
       return;
     }
 
-    // Para requisições POST (queries/mutations GraphQL)
+    // Para requisições POST (queries GraphQL - mutations são bloqueadas)
     const body = req.body || {};
+    
+    // Bloqueia mutations como medida de segurança adicional
+    if (body.operationName || (body.query && body.query.includes('mutation'))) {
+      // Verifica se é uma mutation pela operação ou pela query
+      const isMutation = body.operationName?.toLowerCase().includes('mutation') ||
+                        (body.query && /mutation\s+\w*\{/i.test(body.query));
+      
+      if (isMutation) {
+        return res.status(403).json({ 
+          error: 'Mutations are not allowed. This API is read-only.' 
+        });
+      }
+    }
+    
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const result = await server.executeHTTPGraphQLRequest({
       httpGraphQLRequest: {
