@@ -1,0 +1,191 @@
+Documentação da API GraphQL (v1)
+---
+
+A API principal para usuários foi feita utilizando GraphQL, e pode ser acessada pelo endpoint `/api/v1/`.
+A documentação sobre Neo4j GraphQL (utilizdo para construção da API) está disponível em: `https://neo4j.com/docs/graphql/current/`
+
+---
+
+# 1. Modelo Conceitual (Resumo)
+Abaixo está um resumo dos nós definidos, mas a demonstração completa pode ser analisada no arquivo `/pages/api/v1/index.js`
+
+## Entidades principais
+
+### **debate**
+Representa um debate eleitoral ou político.  
+**Propriedades principais:**
+- `debate_id` (ID): identificador único do debate (também é o ID do vídeo do debate no Youtube)
+- `title` (String): título do debate  
+- `date` (String): data do debate  
+- `cargo` (String): cargo relacionado ao debate  
+- `municipio` (String): município onde ocorreu  
+- `estado` (String): estado onde ocorreu  
+- `candidatos` ([candidato]): lista de candidatos participantes  
+- `discursos` ([fala]): discursos realizados no debate  
+- `temas` ([tema]): temas abordados  
+- `discussoes` ([discussao]): discussões contidas no debate  
+
+### **candidato**
+Representa uma pessoa que participou de debates e pode ter apresentado propostas.  
+**Propriedades principais:**
+- `titulo_eleitoral` (ID): número do título de eleitor  
+- `nome` (String): nome completo do candidato  
+- `discursos` ([fala]): discursos proferidos pelo candidato  
+- `propostas` ([proposal]): propostas feitas pelo candidato  
+- `debates` ([debate]): debates nos quais o candidato participou  
+- `perguntas_direcionadas` ([pergunta]): perguntas que foram direcionadas ao candidato  
+
+### **fala (speech)**
+Representa uma fala ou discurso de um candidato em um debate.  
+**Propriedades principais:**
+- `speech_id` (ID): identificador único da fala  
+- `text` (String): conteúdo textual da fala  
+- `start` (Float): timestamp inicial em segundos  
+- `end` (Float): timestamp final em segundos  
+- `relevance_score` (Float, opcional): score de relevância da fala  
+- `relevance_justification` (String, opcional): justificativa do score  
+- `autor` ([candidato]): autor(es) da fala  
+- `debate` ([debate]): debate ao qual a fala pertence  
+- `propostas` ([proposal]): propostas contidas na fala  
+- `respondeu_a` ([fala]): fala(s) que esta fala respondeu  
+- `foi_respondido_por` ([fala]): fala(s) que responderam a esta fala  
+- `temas` ([tema]): temas abordados na fala  
+- `pergunta` ([pergunta]): caso a fala seja uma pergunta  
+
+### **proposal (proposta)**
+Representa uma proposta apresentada por um candidato.  
+**Propriedades principais:**
+- `proposal_id` (ID): identificador único da proposta  
+- `text` (String): texto da proposta  
+- `candidato` ([candidato]): candidato que fez a proposta  
+- `discursos` ([fala]): discursos em que a proposta foi mencionada  
+
+
+# 2. Exemplos de Uso
+
+Todos os exemplos abaixo utilizam `Python` para executar queries GraphQL via HTTP.
+
+## 2.0. Função auxiliar
+```
+import requests
+
+URL = "https://termometro-eleicoes.vercel.app/api/v1"
+HEADERS = {
+    "Content-Type": "application/json",
+    # "Authorization": "Bearer SEU_TOKEN_SE_HOUVER" 
+}
+
+def run_query(query, variables=None):
+    """Função auxiliar para enviar requisições GraphQL"""
+    response = requests.post(URL, json={'query': query, 'variables': variables}, headers=HEADERS)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"Erro na query: {response.status_code}. {response.text}")
+```
+
+## 2.1. Listar todos os debates disponíveis
+```
+query = """
+query {
+  debates {
+    debate_id
+    title
+    municipio
+  }
+}
+"""
+result = run_query(query)
+```
+
+## 2.2. Listar candidatos que participaram de um debate
+```
+query = """
+query {
+  debates (where: { debate_id: { eq: "8v6ruFkdKHU" } }) {
+    candidatos {
+      nome
+    }
+  }
+}
+"""
+
+result = run_query(query)
+```
+
+## 2.3. Obter informações sobre um candidato
+Analisar tudo o que um candidato falou, quais temas abordou e em quais debates participou.
+
+```
+query = """
+query {
+  candidatos(where: { nome: { eq: "GUILHERME CASTRO BOULOS" } }) {
+    nome
+    discursos {
+      speech_id
+      text
+      start
+      end
+      temas {
+        nome
+      }
+    }
+  }
+}
+"""
+result = run_query(query)
+```
+
+## 2.4. Obter falas realizadas em um debate específico
+```
+query = """
+query {
+  debates(where: { debate_id: { eq: "8v6ruFkdKHU" } }) {
+    title
+    date
+    discursos {
+      text
+      autor {
+        nome
+      }
+      propostas {
+        text
+      }
+      respondeu_a {
+        speech_id
+        text
+      }
+    }
+  }
+}
+"""
+result = run_query(query)
+```
+
+## 2.5. Obter respostas a perguntas em um debate específico 
+```
+query = """
+query {
+  falas (
+    where: { 
+      debate: { 
+        some: {
+          debate_id: { eq: "8v6ruFkdKHU" }
+        }
+      }
+    }
+  ){
+    speech_id
+    text
+    respondeu_a {
+      speech_id
+      text
+      autor {
+        nome
+      }
+    }
+  }
+}
+"""
+result = run_query(query)
+```
