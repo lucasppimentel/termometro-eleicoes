@@ -1,0 +1,26 @@
+# Diarização
+pyannote.audio==3.3.2
+
+# Youtube
+# youtube_transcript_api==0.6.3
+yt_dlp==2024.12.23
+
+# Ambiente
+dotenv
+
+# Banco de dados
+neo4j==5.28.2
+
+# Processamento de dados
+thefuzz==0.22.1
+sentence_transformers==5.1.0
+
+# Frameworks de IA
+langchain==0.3.27
+langchain-community==0.3.29
+langchain-openai==0.3.33
+huggingface_hub==0.34.0
+tokenizers==0.19.1
+transformers==4.44.2
+whisper==1.1.10
+nltk==3.9.1

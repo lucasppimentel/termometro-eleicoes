@@ -1,0 +1,30 @@
+services:
+  neo4j:
+    image: neo4j:latest
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - ./data:/data
+      - ./conf:/conf
+    environment:
+      - NEO4J_AUTH=neo4j/strongpassword
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:7474 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  jupyter:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    env_file: .env
+    volumes:
+    - .:/app
+    ports:
+      - "8888:8888"
+    depends_on:
+      neo4j:
+        condition: service_healthy

@@ -1,0 +1,12 @@
+data
+conf
+.ipynb_checkpoints
+*/__pycache__
+__pycache__
+.env
+Database/Candidatos/*
+Downloads/*
+Database/*
+tests/*
+yt-cookies.txt
+venvDebate312
