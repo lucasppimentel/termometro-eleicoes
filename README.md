@@ -125,6 +125,9 @@ The Pipeline and WebApp are designed to work in sequence:
 ```bash
 cd Pipeline
 # Copy .env_example to .env and configure API keys
+# Download required data files from Google Drive
+python download_data.py
+# Start services with Docker Compose
 docker compose up
 # Access Jupyter notebook at http://localhost:8888
 ```

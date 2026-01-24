@@ -8,6 +8,9 @@ yt_dlp==2024.12.23
 # Ambiente
 dotenv
 
+# Data download
+gdown
+
 # Banco de dados
 neo4j==5.28.2
 

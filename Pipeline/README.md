@@ -166,9 +166,24 @@ pip install -r requirements.txt
 
 Alternatively, dependencies are installed automatically when building the Docker image.
 
-#### 4. Prepare Candidate Data
+#### 4. Download Required Data Files
 
-Ensure candidate CSV files are placed in `Database/Candidatos/`. The pipeline expects TSE (Brazilian Electoral Court) format CSV files with candidate information.
+Some data files were stored in Google Drive due to their size. They are used to create a neo4j database that already has data from candidates of the state of São Paulo, and the data from one debate (8v6ruFkdKHU). Download them using the provided script (or just access the Drive and add them manually):
+
+```bash
+python download_data.py
+```
+
+This will download:
+- `data/neo4j.dump` - Neo4j database dump with pre-loaded candidate data
+- `data/system.dump` - Neo4j system database dump
+- `data/candidates/consulta_cand_2024_SP.csv` - Candidate data CSV file
+
+**Note**: The script will skip files that already exist, so you can safely run it multiple times.
+
+#### 5. Prepare Candidate Data (Alternative)
+
+If you prefer to use your own candidate data, ensure CSV files are placed in `data/candidates/`. The pipeline expects TSE (Brazilian Electoral Court) format CSV files with candidate information. Running `database_startup()` can be used to setup the database with your own data.
 
 ---
 
