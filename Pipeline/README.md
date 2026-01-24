@@ -92,7 +92,9 @@ See `requirements.txt` for the complete list of dependencies.
 Pipeline/
 ├── Database/
 │   └── Candidatos/
-│       └── consulta_cand_2024_SP.csv    # Candidate data from TSE
+│       └── consulta_cand_2024_SP.csv     # Candidate data from TSE
+├── data                                  # Checkpoint of the database with the output of one debate
+│   └── *
 ├── src/
 │   ├── database.py                       # Neo4j database operations
 │   ├── debate_processer.py               # Main processing class

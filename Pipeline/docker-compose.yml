@@ -7,8 +7,10 @@ services:
     volumes:
       - ./data:/data
       - ./conf:/conf
+      - ./load-data.sh:/load-data.sh
     environment:
       - NEO4J_AUTH=neo4j/strongpassword
+    command: ["bash", "/load-data.sh"]
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:7474 || exit 1"]
       interval: 30s

@@ -17,6 +17,8 @@ Project structure:
     │   └── [video_id]
     │       ├── **.pkl
     │       └── video.wav
+    ├── data
+    │   └── *
     ├── src
     │   ├── database.py
     │   ├── debate_processer.py
@@ -31,6 +33,7 @@ Directory description:
 
 - **Database**: contains `.csv` files with public datasets about candidates and elections.
 - **Downloads**: folder containing downloaded YouTube videos and several `.pkl` files with intermediate data (transcriptions, dataframes with identified candidates in the videos, etc.).
+- **data**: files with one checkpoint of the neo4j, containing data from candidates from São Paulo, and the output of the pipeline for one debate.
 - **src**: `.py` files with function and class definitions used in the pipeline.
 - **main.ipynb**: notebook that runs the pipeline in stages.
 
