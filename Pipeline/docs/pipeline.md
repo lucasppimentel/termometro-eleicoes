@@ -159,7 +159,7 @@ Diarization is the process of identifying different **speakers** in audio, segme
 
 The image below represents the output of this process.
 
-![Diarization Output Example](Pipeline\docs\images\diarization.png)
+![Diarization Output Example](images/diarization.png)
 
 The output is a **DataFrame** with:
 
@@ -182,7 +182,7 @@ Example:
 
 The image below is an example of outputs of transcription and diarization one over the other.
 
-![Diarization x Transcription](Pipeline\docs\images\allignment.png)
+![Diarization x Transcription](images/allignment.png)
 
 - Speaker 1 has the highest overlap with Candidate A segments  
 - Speaker 1 is identified as Candidate A  
@@ -257,14 +257,14 @@ someone asks a question, another responds, interruptions happen, comments are ma
 
    The following image represents the expected output.
 
-    ![Speaches Association](Pipeline\docs\images\grouping_1.png)
+    ![Speaches Association](images/grouping_1.png)
 
 3. Group discussions  
    - Relationships are modeled as a graph  
    - Final grouping is done with **NetworkX**
 
    The image below shows the expected output.
-    ![Speaches Association](Pipeline\docs\images\grouping_2.png)
+    ![Speaches Association](images/grouping_2.png)
 
 
 ---
