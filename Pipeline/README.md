@@ -90,11 +90,12 @@ See `requirements.txt` for the complete list of dependencies.
 
 ```
 Pipeline/
-├── Database/
-│   └── Candidatos/
-│       └── consulta_cand_2024_SP.csv     # Candidate data from TSE
-├── data                                  # Checkpoint of the database with the output of one debate
-│   └── *
+│   ├── docs/                             # Markdowns with documentation of specific logics
+│   ├── data/                             # Folder with persisted data from the database
+│   │   ├──candidates/*                   # Candidate data files (CSV)
+│   │   ├──downloads/*                    # Pipeline execution saves
+│   │   ├──neo4j.dump                     # neo4j database setup data (contains data from candidates and Video ID: 8v6ruFkdKHU)
+│   │   └──system.dump                    # neo4j system database setup data
 ├── src/
 │   ├── database.py                       # Neo4j database operations
 │   ├── debate_processer.py               # Main processing class

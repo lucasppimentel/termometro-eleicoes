@@ -140,7 +140,7 @@ class DebateProcesser:
         self.database: Neo4jDatabase = database
         self.sample_length: int = sample_length
         self.video_id: str = video_id
-        self.folder_path: str = f"./Downloads/{self.video_id}"
+        self.folder_path: str = f"./data/downloads/{self.video_id}"
         self.speech_max_pause: int = DEFAULT_SPEECH_MAX_PAUSE
         self.manual_identification = manual_identification
 

@@ -32,14 +32,17 @@ termometro-eleicoes/
 ├── Pipeline/              # ETL pipeline for processing debates
 │   ├── docs/              # Markdowns with documentation of specific logics
 │   ├── data/              # Folder with persisted data from the database
-│   ├── Database/          # Candidate data files (CSV)
+│   │   ├──candidates/*    # Candidate data files (CSV)
+│   │   ├──downloads/*     # Pipeline execution saves
+│   │   ├──neo4j.dump      # neo4j database setup data (contains data from candidates and Video ID: 8v6ruFkdKHU)
+│   │   └──system.dump     # neo4j system database setup data
 │   ├── src/               # Python source code
 │   ├── main.ipynb         # Jupyter notebook entry point
 │   ├── docker-compose.yml # Docker setup for pipeline services
 │   └── requirements.txt   # Python dependencies
 │
 └── WebApp/                # Next.js web application
-│   ├── docs/              # Markdowns with documentation of specific logics
+    ├── docs/              # Markdowns with documentation of specific logics
     ├── components/        # React components
     ├── pages/             # Next.js pages and API routes
     ├── infra/             # Infrastructure configuration

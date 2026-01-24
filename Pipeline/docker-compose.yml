@@ -10,7 +10,10 @@ services:
       - ./load-data.sh:/load-data.sh
     environment:
       - NEO4J_AUTH=neo4j/strongpassword
-    command: ["bash", "/load-data.sh"]
+      - NEO4J_server_bolt_listen__address=0.0.0.0
+      - NEO4J_server_http_listen__address=0.0.0.0
+      - NEO4J_CONF=/conf
+    entrypoint: ["/bin/bash", "/load-data.sh"]
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:7474 || exit 1"]
       interval: 30s
