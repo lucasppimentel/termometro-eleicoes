@@ -196,7 +196,11 @@ class DebateProcesser:
                     except OSError as e:
                         logger.warning(f"Failed to remove empty file {candidate}: {e}")
 
-        if not audio_path:
+        # Verifica se já existe transcrição salva
+        transcript_pkl = os.path.join(self.folder_path, TRANSCRIPT_FILENAME)
+        transcript_exists = os.path.exists(transcript_pkl)
+
+        if not audio_path and not transcript_exists:
             downloaded_file = download_audio(
                 f"https://www.youtube.com/watch?v={self.video_id}",
                 output_path=os.path.join(self.folder_path, "video.%(ext)s"),
@@ -206,9 +210,8 @@ class DebateProcesser:
                 if os.path.getsize(downloaded_file) == 0:
                     raise Exception(f"Downloaded file is empty: {downloaded_file}")
 
-        # Verifica se já existe transcrição salva
-        transcript_pkl = os.path.join(self.folder_path, TRANSCRIPT_FILENAME)
-        if os.path.exists(transcript_pkl):
+        # Se já existe transcrição salva, carrega ela
+        if transcript_exists:
             logger.info("Loading existing transcript")
             with open(transcript_pkl, "rb") as f:
                 segments = pickle.load(f)
