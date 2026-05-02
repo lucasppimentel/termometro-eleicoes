@@ -3,7 +3,7 @@ import neo4j from "neo4j-driver";
 
 // Neo4j connection setup
 const neo4jUri = process.env.NEO4J_URL;
-const neo4jUser = "neo4j";
+const neo4jUser = process.env.NEO4J_USER;
 const neo4jPassword = process.env.NEO4J_PASSWORD;
 
 let neo4jDriver = null;
